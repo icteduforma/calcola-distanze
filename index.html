@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📍</text></svg>">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calcolatore di Distanze Geografiche</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-slate-50 text-slate-800">
+  
+  <div class="min-h-screen container mx-auto p-4 md:p-8">
+    <header class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-slate-800">Calcolatore di Distanze Geografiche</h1>
+      <p class="text-slate-600 mt-2">Incrocia liste di aziende e persone per calcolare le distanze tra i loro indirizzi.</p>
+    </header>
+
+    <!-- Setup Section -->
+    <div id="setup-section" class="space-y-8">
+      <div class="grid md:grid-cols-2 gap-8">
+        <!-- Companies Column -->
+        <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+          <h2 class="text-2xl font-semibold mb-4 text-slate-700 flex items-center gap-2" id="companies-title-icon"></h2>
+          <div id="companies-uploader-container"></div>
+          <div id="companies-selector-container" class="hidden"></div>
+        </div>
+        <!-- Users Column -->
+        <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+          <h2 class="text-2xl font-semibold mb-4 text-slate-700 flex items-center gap-2" id="users-title-icon"></h2>
+          <div id="users-uploader-container"></div>
+          <div id="users-selector-container" class="hidden"></div>
+        </div>
+      </div>
+      <div id="calculate-button-container" class="text-center mt-8 hidden">
+        <button id="calculate-button" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-blue-700 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300">
+          Avvia Calcolo Distanze
+        </button>
+      </div>
+    </div>
+
+    <!-- Processing Section -->
+    <div id="processing-section" class="hidden text-center p-8 bg-white rounded-lg shadow-md">
+      <div id="spinner-container"></div>
+      <p id="progress-message" class="text-lg font-semibold mt-4 text-slate-700"></p>
+      <p class="text-slate-500 mt-2">L'operazione potrebbe richiedere alcuni minuti...</p>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-section" class="hidden bg-white p-6 rounded-lg shadow-md border border-slate-200 w-full">
+      <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+        <h2 class="text-2xl font-semibold text-slate-700">Risultati del Calcolo</h2>
+        <button id="reset-button" class="mt-4 md:mt-0 flex items-center gap-2 bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors text-sm font-medium"></button>
+      </div>
+      <div class="flex items-center border-b border-slate-200 mb-4">
+        <button id="tab-results" class="px-4 py-2 text-sm font-medium rounded-md"></button>
+        <button id="tab-errors" class="px-4 py-2 text-sm font-medium rounded-md"></button>
+      </div>
+      <!-- Results Tab Content -->
+      <div id="results-content">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+          <input type="text" id="filter-input" placeholder="Filtra risultati..." class="w-full md:w-1/3 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+          <button id="download-results-button" class="w-full md:w-auto flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"></button>
+        </div>
+        <div class="overflow-x-auto max-h-[60vh] relative">
+          <table class="min-w-full divide-y divide-slate-200">
+            <thead id="results-table-head" class="bg-slate-50 sticky top-0"></thead>
+            <tbody id="results-table-body" class="bg-white divide-y divide-slate-200"></tbody>
+          </table>
+          <p id="no-results-message" class="hidden text-center p-4 text-slate-500">Nessun risultato trovato.</p>
+        </div>
+      </div>
+      <!-- Errors Tab Content -->
+      <div id="errors-content" class="hidden">
+        <div class="text-right mb-4">
+          <button id="download-errors-button" class="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium ml-auto"></button>
+        </div>
+        <div class="overflow-x-auto max-h-[60vh]">
+          <table class="min-w-full divide-y divide-slate-200">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Tipo</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Indirizzo Non Trovato</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Dati Originali</th>
+              </tr>
+            </thead>
+            <tbody id="errors-table-body" class="bg-white divide-y divide-slate-200"></tbody>
+          </table>
+          <p id="no-errors-message" class="hidden text-center p-4 text-slate-500">Nessun errore di geocodifica.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="index.js" defer></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
