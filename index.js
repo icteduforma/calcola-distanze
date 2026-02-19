@@ -124,17 +124,28 @@ const geocodeAddress = async (address) => {
     };
     const fetchGeocode = async (query) => {
         if (!query || query.trim() === '') return null;
-        const url = `${API_ENDPOINT}?q=${encodeURIComponent(query)}&format=json&limit=1&countrycodes=it`;
+        // Definiamo i confini del Veneto: lon_min, lat_max, lon_max, lat_min
+        const venetoViewbox = "10.38,46.67,13.13,44.79";
+        
+        // Aggiungiamo 'Veneto, Italia' alla query per sicurezza testuale
+        const enhancedQuery = `${query}, Veneto, Italia`;
+    
+        // URL con viewbox e bounded=1 per forzare i risultati nell'area definita
+        const url = `${API_ENDPOINT}?q=${encodeURIComponent(enhancedQuery)}&format=json&limit=1&countrycodes=it&viewbox=${venetoViewbox}&bounded=1`;
+        
         try {
-            const response = await fetch(url, { headers: { 'User-Agent': 'GeoDistanceCalculator/1.0' } });
+            const response = await fetch(url, { 
+                headers: { 'User-Agent': 'GeoDistanceCalculator/1.0' } 
+            });
             if (!response.ok) return null;
             const data = await response.json();
+            
             if (data && data.length > 0) {
                 return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
             }
             return null;
         } catch (error) {
-            console.error(`Fetch fallito per "${query}":`, error);
+            console.error(`Fetch fallito per "${enhancedQuery}":`, error);
             return null;
         }
     };
