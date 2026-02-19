@@ -159,6 +159,9 @@ const geocodeAddress = async (address) => {
         triedQueries.add(normalizedQuery);
         return await fetchGeocode(query);
     };
+
+    //inizio
+    let result = null;
     
     const zipCode = extractZipCode(address);
     if (zipCode) {
