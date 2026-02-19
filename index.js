@@ -149,13 +149,21 @@ const geocodeAddress = async (address) => {
         return await fetchGeocode(query);
     };
 
+    //aggiunte
+    const zipCode = extractZipCode(address);
+    if (zipCode) {
+        result = await tryQuery(zipCode);
+        if (result) return result;
+    }
+    //fine aggiunte
+    
     let result = await tryQuery(standardizeAndCleanAddress(address));
     if (result) return result;
     
     result = await tryQuery(address);
     if (result) return result;
 
-    const municipality = extractMunicipality(address);
+    /*const municipality = extractMunicipality(address);
     const zipCode = extractZipCode(address);
     if (municipality && zipCode) {
         result = await tryQuery(`${municipality} ${zipCode}`);
@@ -165,6 +173,8 @@ const geocodeAddress = async (address) => {
         result = await tryQuery(municipality);
         if (result) return result;
     }
+    */
+    
     return null;
 };
 
