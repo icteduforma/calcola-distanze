@@ -1,14 +1,12 @@
-// --- FUNZIONI DI UTILITÀ ---
-
+// --- UTILS ---
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Raggio della Terra in km
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return parseFloat((R * c).toFixed(2));
 };
 
@@ -17,9 +15,9 @@ const parseCsv = (csvText) => {
     let currentRow = [], currentField = '', inQuotes = false;
     let text = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     for (let i = 0; i < text.length; i++) {
-        const char = text[i], nextChar = text[i + 1];
+        const char = text[i], next = text[i+1];
         if (inQuotes) {
-            if (char === '"' && nextChar === '"') { currentField += '"'; i++; }
+            if (char === '"' && next === '"') { currentField += '"'; i++; }
             else if (char === '"') inQuotes = false;
             else currentField += char;
         } else {
@@ -30,41 +28,16 @@ const parseCsv = (csvText) => {
         }
     }
     if (currentField || currentRow.length) { currentRow.push(currentField); rows.push(currentRow); }
-    const validRows = rows.filter(r => r.some(f => f.trim() !== ''));
-    return { headers: validRows[0] || [], rows: validRows.slice(1) };
+    const filtered = rows.filter(r => r.some(f => f.trim() !== ''));
+    return { headers: filtered[0] || [], rows: filtered.slice(1) };
 };
 
-const exportToCsv = (headers, data, fileName) => {
-    const escape = (f) => /[",\n]/.test(String(f)) ? `"${String(f).replace(/"/g, '""')}"` : String(f);
-    const content = [headers.map(escape).join(','), ...data.map(r => r.map(escape).join(','))].join('\n');
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = fileName;
-    link.click();
-};
-
-// --- LOGICA DI GEOPOSIZIONAMENTO (VENETO ORIENTED) ---
-
-const standardizeAddress = (addr) => {
-    if (!addr) return '';
-    let clean = addr.toLowerCase();
-    const abbr = {'v\\.le': 'viale', 'p\\.zza': 'piazza', 'p\\.za': 'piazza', 'c\\.so': 'corso', 'v\\.': 'via'};
-    for (const a in abbr) clean = clean.replace(new RegExp(`\\b${a}\\b`, 'g'), abbr[a]);
-    return clean.replace(/\b(piano terra|interno \d+|scala \w+)\b/g, '').replace(/[^\w\sàèéìòù',-]/g, ' ').replace(/\s+/g, ' ').trim();
-};
-
-const extractZipCode = (addr) => {
-    const match = addr.match(/\b(\d{5})\b/);
-    return match ? match[0] : null;
-};
-
+// --- GEO LOGIC ---
 const fetchGeocode = async (query) => {
     if (!query) return null;
     const API = "https://nominatim.openstreetmap.org/search";
     const box = "10.38,46.67,13.13,44.79"; // Veneto
-    const isZip = /^\d{5}$/.test(query.trim());
-    const q = isZip ? `CAP ${query}, Veneto, Italia` : `${query}, Veneto, Italia`;
+    const q = /^\d{5}$/.test(query.trim()) ? `CAP ${query}, Veneto, Italia` : `${query}, Veneto, Italia`;
     
     try {
         const res = await fetch(`${API}?q=${encodeURIComponent(q)}&format=json&limit=1&viewbox=${box}&bounded=1`, {
@@ -77,50 +50,40 @@ const fetchGeocode = async (query) => {
 
 const geocodeAddress = async (address) => {
     let result = null;
-    const tried = new Set();
-    const tryQ = async (q) => {
-        if (!q || tried.has(q.toLowerCase())) return null;
-        tried.add(q.toLowerCase());
-        return await fetchGeocode(q);
-    };
-
+    const zip = address.match(/\b(\d{5})\b/)?.[0];
+    
     // 1. CAP (Priorità utente)
-    const zip = extractZipCode(address);
     if (zip) {
-        result = await tryQ(zip);
+        result = await fetchGeocode(zip);
         if (result) return result;
     }
 
-    // 2. Indirizzo pulito
-    result = await tryQ(standardizeAddress(address));
-    if (result) return result;
-
-    // 3. Indirizzo originale
-    return await tryQ(address);
+    // 2. Indirizzo completo
+    return await fetchGeocode(address);
 };
 
-// --- APP UI LOGIC ---
-
+// --- UI CONTROL ---
 document.addEventListener('DOMContentLoaded', () => {
     let companies = null, users = null, companyCol = null, userCol = null;
-    let results = [], errors = [];
+    let results = [];
 
     const DOMElements = {
         setupSection: document.getElementById('setup-section'),
         processingSection: document.getElementById('processing-section'),
         resultsSection: document.getElementById('results-section'),
-        companiesUploaderContainer: document.getElementById('companies-uploader-container'),
-        usersUploaderContainer: document.getElementById('users-uploader-container'),
-        calculateButton: document.getElementById('calculate-button'),
-        calculateButtonContainer: document.getElementById('calculate-button-container'),
-        progressMessage: document.getElementById('progress-message'),
-        resultsTableBody: document.getElementById('results-table-body'),
-        resultsTableHead: document.getElementById('results-table-head'),
-        resetButton: document.getElementById('reset-button')
+        companiesUploader: document.getElementById('companies-uploader-container'),
+        usersUploader: document.getElementById('users-uploader-container'),
+        calculateBtn: document.getElementById('calculate-button'),
+        calculateBtnContainer: document.getElementById('calculate-button-container'),
+        progress: document.getElementById('progress-message'),
+        resultsBody: document.getElementById('results-table-body'),
+        resultsHead: document.getElementById('results-table-head')
     };
 
-    const updateUI = () => {
-        DOMElements.calculateButtonContainer.classList.toggle('hidden', !(companies && users && companyCol !== null && userCol !== null));
+    const renderUploader = (type) => {
+        const container = type === 'companies' ? DOMElements.companiesUploader : DOMElements.usersUploader;
+        container.innerHTML = `<input type="file" id="file-${type}" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" accept=".csv" />`;
+        document.getElementById(`file-${type}`).addEventListener('change', (e) => handleFile(e.target.files[0], type));
     };
 
     const handleFile = (file, type) => {
@@ -130,66 +93,64 @@ document.addEventListener('DOMContentLoaded', () => {
             if (type === 'companies') { companies = data; companyCol = null; }
             else { users = data; userCol = null; }
             
-            const container = type === 'companies' ? document.getElementById('companies-selector-container') : document.getElementById('users-selector-container');
-            const uploader = type === 'companies' ? DOMElements.companiesUploaderContainer : DOMElements.usersUploaderContainer;
+            const selector = type === 'companies' ? document.getElementById('companies-selector-container') : document.getElementById('users-selector-container');
+            const uploader = type === 'companies' ? DOMElements.companiesUploader : DOMElements.usersUploader;
             
             uploader.classList.add('hidden');
-            container.innerHTML = `
-                <div class="p-3 bg-slate-100 rounded mb-2"><b>File:</b> ${file.name}</div>
-                <label class="block text-sm mb-2">Colonna Indirizzo:</label>
-                ${data.headers.map((h, i) => `
-                    <label class="flex items-center mb-1 cursor-pointer">
-                        <input type="radio" name="col-${type}" value="${i}" class="mr-2"> ${h}
-                    </label>
-                `).join('')}
-            `;
-            container.classList.remove('hidden');
-            container.addEventListener('change', (ev) => {
-                if (type === 'companies') companyCol = parseInt(ev.target.value);
-                else userCol = parseInt(ev.target.value);
-                updateUI();
+            selector.innerHTML = `
+                <p class="text-sm font-bold mb-2">${file.name}</p>
+                <select class="w-full p-2 border rounded" id="select-${type}">
+                    <option value="">Seleziona colonna indirizzo...</option>
+                    ${data.headers.map((h, i) => `<option value="${i}">${h}</option>`).join('')}
+                </select>`;
+            selector.classList.remove('hidden');
+            document.getElementById(`select-${type}`).addEventListener('change', (ev) => {
+                if (type === 'companies') companyCol = ev.target.value;
+                else userCol = ev.target.value;
+                DOMElements.calculateBtnContainer.classList.toggle('hidden', !(companies && users && companyCol !== null && userCol !== null));
             });
         };
         reader.readAsText(file);
     };
 
-    DOMElements.calculateButton.addEventListener('click', async () => {
+    DOMElements.calculateBtn.addEventListener('click', async () => {
         DOMElements.setupSection.classList.add('hidden');
         DOMElements.processingSection.classList.remove('hidden');
-        results = []; errors = [];
+        results = [];
 
         const process = async (list, col, label) => {
-            const geocoded = [];
+            const geo = [];
             for (let i = 0; i < list.rows.length; i++) {
-                DOMElements.progressMessage.textContent = `${label}: riga ${i+1}/${list.rows.length}`;
+                DOMElements.progress.textContent = `${label}: ${i+1}/${list.rows.length}`;
                 const coords = await geocodeAddress(list.rows[i][col]);
-                if (coords) geocoded.push({ data: list.rows[i], ...coords });
-                else errors.push({ type: label, address: list.rows[i][col], data: list.rows[i] });
+                if (coords) geo.push({ data: list.rows[i], ...coords });
                 await new Promise(r => setTimeout(r, 1000));
             }
-            return geocoded;
+            return geo;
         };
 
-        const geoCompanies = await process(companies, companyCol, 'Azienda');
-        const geoUsers = await process(users, userCol, 'Utente');
+        const geoCompanies = await process(companies, companyCol, 'Aziende');
+        const geoUsers = await process(users, userCol, 'Utenti');
 
         geoUsers.forEach(u => {
             geoCompanies.forEach(c => {
-                const d = calculateDistance(u.lat, u.lon, c.lat, c.lon);
-                results.push({ userData: u.data, companyData: c.data, distance: d });
+                results.push({ 
+                    uData: u.data, 
+                    cData: c.data, 
+                    dist: calculateDistance(u.lat, u.lon, c.lat, c.lon) 
+                });
             });
         });
 
-        results.sort((a, b) => a.distance - b.distance);
-        
-        DOMElements.resultsTableHead.innerHTML = `<tr>${users.headers.map(h => `<th>${h}</th>`).join('')}${companies.headers.map(h => `<th>${h}</th>`).join('')}<th>Km</th></tr>`;
-        DOMElements.resultsTableBody.innerHTML = results.map(r => `<tr>${[...r.userData, ...r.companyData, r.distance].map(v => `<td>${v}</td>`).join('')}</tr>`).join('');
+        results.sort((a, b) => a.dist - b.dist);
+        DOMElements.resultsHead.innerHTML = `<tr>${users.headers.map(h => `<th>${h}</th>`).join('')}${companies.headers.map(h => `<th>${h}</th>`).join('')}<th>Km</th></tr>`;
+        DOMElements.resultsBody.innerHTML = results.map(r => `<tr>${[...r.uData, ...r.cData, r.dist].map(v => `<td>${v}</td>`).join('')}</tr>`).join('');
         
         DOMElements.processingSection.classList.add('hidden');
         DOMElements.resultsSection.classList.remove('hidden');
     });
 
-    document.getElementById('file-upload-companies').addEventListener('change', (e) => handleFile(e.target.files[0], 'companies'));
-    document.getElementById('file-upload-users').addEventListener('change', (e) => handleFile(e.target.files[0], 'users'));
-    DOMElements.resetButton.addEventListener('click', () => location.reload());
+    renderUploader('companies');
+    renderUploader('users');
+    document.getElementById('reset-button').addEventListener('click', () => location.reload());
 });
