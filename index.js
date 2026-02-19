@@ -161,6 +161,8 @@ const geocodeAddress = async (address) => {
     };
 
     //aggiunte
+    let result = null;
+    
     const zipCode = extractZipCode(address);
     if (zipCode) {
         result = await tryQuery(zipCode);
@@ -168,7 +170,7 @@ const geocodeAddress = async (address) => {
     }
     //fine aggiunte
     
-    let result = await tryQuery(standardizeAndCleanAddress(address));
+    result = await tryQuery(standardizeAndCleanAddress(address));
     if (result) return result;
     
     result = await tryQuery(address);
