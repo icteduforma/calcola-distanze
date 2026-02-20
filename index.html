@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoDistance Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .spinner { border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; width: 24px; height: 24px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <header class="mb-10 text-center">
+            <h1 class="text-3xl font-bold text-slate-900 tracking-tight flex items-center justify-center gap-3">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                GeoDistance Calculator
+            </h1>
+            <p class="mt-2 text-slate-500">Calcola la distanza tra liste di aziende e utenti</p>
+        </header>
+
+        <div id="setup-section" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300">
+            <div class="p-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    <div class="space-y-6">
+                        <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
+                            <span id="companies-title-icon" class="text-blue-600 flex items-center gap-2 font-semibold text-lg"></span>
+                        </div>
+                        <div id="companies-uploader-container"></div>
+                        <div id="companies-selector-container" class="hidden transition-all duration-300"></div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
+                            <span id="users-title-icon" class="text-green-600 flex items-center gap-2 font-semibold text-lg"></span>
+                        </div>
+                        <div id="users-uploader-container"></div>
+                        <div id="users-selector-container" class="hidden transition-all duration-300"></div>
+                    </div>
+                </div>
+
+                <div id="calculate-button-container" class="mt-10 hidden flex flex-col sm:flex-row justify-center gap-4 border-t border-slate-100 pt-8">
+                    <button id="calculate-button" class="inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-sm w-full sm:w-auto">
+                        <svg class="mr-2 -ml-1 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        Calcola Distanza in Linea d'Aria
+                    </button>
+                    
+                    <button id="calculate-driving-button" class="inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors shadow-sm w-full sm:w-auto">
+                        <svg class="mr-2 -ml-1 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+                        Calcola Distanza Stradale (Lento)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="processing-section" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center transition-all duration-300 mt-8">
+            <div id="spinner-container" class="flex justify-center mb-6"></div>
+            <h3 class="text-xl font-medium text-slate-800 mb-2">Elaborazione in corso...</h3>
+            <p id="progress-message" class="text-slate-500">Inizializzazione geocodifica</p>
+        </div>
+
+        <div id="results-section" class="hidden mt-8 transition-all duration-300">
+            
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex space-x-2 bg-slate-200/50 p-1 rounded-lg">
+                    <button id="tab-results" class="px-5 py-2 text-sm font-medium rounded-md bg-blue-600 text-white shadow-sm transition-all flex items-center">
+                        Risultati <span class="ml-2 bg-white text-blue-600 px-2 py-0.5 rounded-full text-xs font-bold">0</span>
+                    </button>
+                    <button id="tab-errors" class="px-5 py-2 text-sm font-medium rounded-md text-slate-600 hover:text-slate-900 transition-all flex items-center">
+                        Errori <span class="ml-2 bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-xs font-bold">0</span>
+                    </button>
+                </div>
+                <button id="reset-button" class="text-slate-500 hover:text-slate-800 text-sm font-medium flex items-center transition-colors">
+                    Nuovo Calcolo
+                </button>
+            </div>
+
+            <div id="results-content" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div class="relative w-64">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                        <input type="text" id="filter-input" placeholder="Cerca risultati..." class="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-md leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors">
+                    </div>
+                    <button id="download-results-button" class="inline-flex items-center px-4 py-2 border border-slate-300 shadow-sm text-sm font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        Scarica CSV
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto max-h-[600px]">
+                    <table class="min-w-full divide-y divide-slate-200 relative">
+                        <thead class="bg-slate-50 sticky top-0 z-10" id="results-table-head"></thead>
+                        <tbody class="bg-white divide-y divide-slate-100" id="results-table-body"></tbody>
+                    </table>
+                    <div id="no-results-message" class="hidden text-center py-12 text-slate-500">
+                        Nessun risultato trovato per la ricerca corrente.
+                    </div>
+                </div>
+            </div>
+
+            <div id="errors-content" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex justify-end bg-slate-50/50">
+                    <button id="download-errors-button" class="inline-flex items-center px-4 py-2 border border-red-200 shadow-sm text-sm font-medium rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+                        Scarica Errori CSV
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto max-h-[600px]">
+                    <table class="min-w-full divide-y divide-slate-200 relative">
+                        <thead class="bg-slate-50 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Tipo</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Indirizzo Fallito</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Dati Originali</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-slate-100" id="errors-table-body"></tbody>
+                    </table>
+                    <div id="no-errors-message" class="hidden text-center py-12 text-slate-500">
+                        Nessun errore rilevato! 🎉
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+    <script src="index.js"></script>
+</body>
+</html>
