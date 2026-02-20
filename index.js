@@ -224,7 +224,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const renderResultsTable = () => {
         const lowercasedFilter = filter.toLowerCase();
+        
+        // 1. Filtra tutti i risultati in base alla ricerca (se presente)
         const filteredResults = results.filter(res => !filter || res.companyData.some(d => String(d).toLowerCase().includes(lowercasedFilter)) || res.userData.some(d => String(d).toLowerCase().includes(lowercasedFilter)));
+        
+        // 2. Imposta il limite massimo per la UI per evitare lag
+        const DISPLAY_LIMIT = 300;
+        const resultsToDisplay = filteredResults.slice(0, DISPLAY_LIMIT);
         
         const thClass = "px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider";
         DOMElements.resultsTableHead.innerHTML = `<tr>
@@ -239,7 +245,9 @@ document.addEventListener('DOMContentLoaded', () => {
         </tr>`;
         
         const tdClass = "px-4 py-3 whitespace-nowrap text-sm text-slate-600";
-        DOMElements.resultsTableBody.innerHTML = filteredResults.map(res => `<tr class="hover:bg-slate-50">
+        
+        // 3. Renderizza solo i primi 300 risultati
+        DOMElements.resultsTableBody.innerHTML = resultsToDisplay.map(res => `<tr class="hover:bg-slate-50">
             ${res.userData.map(d => `<td class="${tdClass}">${d}</td>`).join('')}
             <td class="${tdClass} bg-blue-50/30 text-xs font-mono">${res.userLat}</td>
             <td class="${tdClass} bg-blue-50/30 text-xs font-mono">${res.userLon}</td>
@@ -249,6 +257,18 @@ document.addEventListener('DOMContentLoaded', () => {
             <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-blue-700">${res.distance}</td>
             ${usedDrivingMode ? `<td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-indigo-700 bg-indigo-50/30">${res.drivingDistance !== null ? res.drivingDistance : 'N/D'}</td>` : ''}
         </tr>`).join('');
+        
+        // 4. Aggiunge un avviso a fine tabella se ci sono risultati nascosti
+        if (filteredResults.length > DISPLAY_LIMIT) {
+            DOMElements.resultsTableBody.innerHTML += `
+                <tr>
+                    <td colspan="100%" class="px-4 py-6 text-center text-sm font-medium text-slate-500 bg-slate-50 border-t border-slate-200">
+                        Mostrati i primi ${DISPLAY_LIMIT} di ${filteredResults.length} risultati per garantire le prestazioni della pagina. <br>
+                        <span class="text-blue-600">Scarica il file CSV per visualizzare l'elenco completo.</span>
+                    </td>
+                </tr>
+            `;
+        }
         
         DOMElements.noResultsMessage.classList.toggle('hidden', filteredResults.length > 0);
     };
